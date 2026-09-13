@@ -2,9 +2,8 @@ import joblib
 import re
 
 # Load the saved model and vectorizer
-model = joblib.load('fake_news_model.pkl')
-vectorizer = joblib.load('tfidf_vectorizer.pkl')
-
+model = joblib.load('fake_news_model_v2.pkl')
+vectorizer = joblib.load('tfidf_vectorizer_v2.pkl')
 def clean_text(text):
     text = text.lower()
     text = re.sub(r'http\S+|www\S+', '', text)

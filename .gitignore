@@ -1,4 +1,7 @@
 dataset/*.csv
+dataset/ag_news/
+dataset/ag_news_diverse.csv
+dataset/combined_data_v2.csv
 venv/
 __pycache__/
 *.pyc
