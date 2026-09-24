@@ -6,7 +6,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 600px;
+            max-width: 650px;
             margin: 50px auto;
             padding: 20px;
             background: #f4f4f4;
@@ -34,12 +34,14 @@
         #checkBtn:hover { background: #1d4ed8; }
         #verifyBtn { background: #059669; }
         #verifyBtn:hover { background: #047857; }
+        #analyzeBtn { background: #7c3aed; }
+        #analyzeBtn:hover { background: #6d28d9; }
 
-        #result, #verifyResult {
-            margin-top: 20px;
+        #result, #verifyResult, #analyzeResult {
+            margin-top: 15px;
             padding: 15px;
             border-radius: 5px;
-            font-size: 16px;
+            font-size: 15px;
             display: none;
         }
         #result { text-align: center; font-weight: bold; font-size: 18px; }
@@ -49,6 +51,15 @@
         .verify-true { background: #d1fae5; color: #065f46; }
         .verify-uncertain { background: #fef3c7; color: #92400e; }
         .verify-false { background: #fee2e2; color: #991b1b; }
+
+        .analyze-true { background: #d1fae5; color: #065f46; }
+        .analyze-false { background: #fee2e2; color: #991b1b; }
+        .analyze-misleading { background: #fef3c7; color: #92400e; }
+        .analyze-unrelated { background: #e0e7ff; color: #3730a3; }
+        .analyze-noevidence { background: #f3f4f6; color: #374151; }
+
+        .verdict-title { font-weight: bold; font-size: 16px; margin-bottom: 8px; }
+        .explanation { line-height: 1.5; }
 
         .article-item {
             margin-top: 10px;
@@ -67,18 +78,17 @@
     <button id="checkBtn" onclick="checkNews()">Check (ML Style Analysis)</button>
     <div id="result"></div>
 
-    <button id="verifyBtn" onclick="verifyNews()">Verify with Sources (Live Search)</button>
+    <button id="verifyBtn" onclick="verifyNews()">Find Sources (Live Search)</button>
     <div id="verifyResult"></div>
+
+    <button id="analyzeBtn" onclick="analyzeNews()">AI Analysis (Groq + Evidence)</button>
+    <div id="analyzeResult"></div>
 
     <script>
         async function checkNews() {
             const text = document.getElementById('newsText').value;
             const resultDiv = document.getElementById('result');
-
-            if (!text.trim()) {
-                alert('Please enter some text first.');
-                return;
-            }
+            if (!text.trim()) { alert('Please enter some text first.'); return; }
 
             resultDiv.style.display = 'block';
             resultDiv.className = '';
@@ -89,13 +99,9 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: text })
             });
-
             const data = await response.json();
 
-            if (data.error) {
-                resultDiv.textContent = 'Error: ' + data.error;
-                return;
-            }
+            if (data.error) { resultDiv.textContent = 'Error: ' + data.error; return; }
 
             resultDiv.className = data.label === 'REAL' ? 'real' : 'fake';
             resultDiv.textContent = `${data.label} (${data.confidence}% confidence)`;
@@ -104,11 +110,7 @@
         async function verifyNews() {
             const text = document.getElementById('newsText').value;
             const verifyDiv = document.getElementById('verifyResult');
-
-            if (!text.trim()) {
-                alert('Please enter some text first.');
-                return;
-            }
+            if (!text.trim()) { alert('Please enter some text first.'); return; }
 
             verifyDiv.style.display = 'block';
             verifyDiv.className = '';
@@ -119,22 +121,16 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: text })
             });
-
             const data = await response.json();
 
-            if (data.error) {
-                verifyDiv.innerHTML = 'Error: ' + data.error;
-                return;
-            }
+            if (data.error) { verifyDiv.innerHTML = 'Error: ' + data.error; return; }
 
             let cssClass = 'verify-false';
             if (data.verdict === 'LIKELY TRUE') cssClass = 'verify-true';
             else if (data.verdict === 'UNCERTAIN - LIMITED EVIDENCE') cssClass = 'verify-uncertain';
 
             verifyDiv.className = cssClass;
-
             let html = `<strong>${data.verdict}</strong> (${data.sources_found} sources found)`;
-
             if (data.articles && data.articles.length > 0) {
                 html += '<div>';
                 data.articles.forEach(a => {
@@ -142,8 +138,49 @@
                 });
                 html += '</div>';
             }
-
             verifyDiv.innerHTML = html;
+        }
+
+        async function analyzeNews() {
+            const text = document.getElementById('newsText').value;
+            const analyzeDiv = document.getElementById('analyzeResult');
+            if (!text.trim()) { alert('Please enter some text first.'); return; }
+
+            analyzeDiv.style.display = 'block';
+            analyzeDiv.className = 'analyze-noevidence';
+            analyzeDiv.innerHTML = 'Searching evidence and analyzing with AI... (this takes a few seconds)';
+
+            const response = await fetch('/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+            const data = await response.json();
+
+            if (data.error) { analyzeDiv.innerHTML = 'Error: ' + data.error; return; }
+
+            const verdict = (data.verdict || '').toUpperCase();
+            let cssClass = 'analyze-noevidence';
+            if (verdict.includes('TRUE')) cssClass = 'analyze-true';
+            else if (verdict.includes('FALSE')) cssClass = 'analyze-false';
+            else if (verdict.includes('MISLEADING')) cssClass = 'analyze-misleading';
+            else if (verdict.includes('UNRELATED')) cssClass = 'analyze-unrelated';
+            else if (verdict.includes('NO EVIDENCE')) cssClass = 'analyze-noevidence';
+
+            analyzeDiv.className = cssClass;
+
+            let html = `<div class="verdict-title">${data.verdict}</div>`;
+            html += `<div class="explanation">${data.explanation}</div>`;
+
+            if (data.articles && data.articles.length > 0) {
+                html += '<div style="margin-top:12px;">';
+                data.articles.forEach(a => {
+                    html += `<div class="article-item">📰 <a href="${a.url}" target="_blank">${a.title}</a> — ${a.source}</div>`;
+                });
+                html += '</div>';
+            }
+
+            analyzeDiv.innerHTML = html;
         }
     </script>
 </body>

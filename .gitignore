@@ -5,3 +5,4 @@ dataset/combined_data_v2.csv
 venv/
 __pycache__/
 *.pyc
+.env
