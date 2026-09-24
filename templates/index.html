@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fake News Detector</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f4f4f4;
+        }
+        h1 { text-align: center; }
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            color: white;
+        }
+        #checkBtn { background: #2563eb; }
+        #checkBtn:hover { background: #1d4ed8; }
+        #verifyBtn { background: #059669; }
+        #verifyBtn:hover { background: #047857; }
+
+        #result, #verifyResult {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 16px;
+            display: none;
+        }
+        #result { text-align: center; font-weight: bold; font-size: 18px; }
+        .real { background: #d1fae5; color: #065f46; }
+        .fake { background: #fee2e2; color: #991b1b; }
+
+        .verify-true { background: #d1fae5; color: #065f46; }
+        .verify-uncertain { background: #fef3c7; color: #92400e; }
+        .verify-false { background: #fee2e2; color: #991b1b; }
+
+        .article-item {
+            margin-top: 10px;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .article-item a { color: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>Fake News Detector</h1>
+    <textarea id="newsText" placeholder="Paste a news headline or article text here..."></textarea>
+
+    <button id="checkBtn" onclick="checkNews()">Check (ML Style Analysis)</button>
+    <div id="result"></div>
+
+    <button id="verifyBtn" onclick="verifyNews()">Verify with Sources (Live Search)</button>
+    <div id="verifyResult"></div>
+
+    <script>
+        async function checkNews() {
+            const text = document.getElementById('newsText').value;
+            const resultDiv = document.getElementById('result');
+
+            if (!text.trim()) {
+                alert('Please enter some text first.');
+                return;
+            }
+
+            resultDiv.style.display = 'block';
+            resultDiv.className = '';
+            resultDiv.textContent = 'Checking...';
+
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                resultDiv.textContent = 'Error: ' + data.error;
+                return;
+            }
+
+            resultDiv.className = data.label === 'REAL' ? 'real' : 'fake';
+            resultDiv.textContent = `${data.label} (${data.confidence}% confidence)`;
+        }
+
+        async function verifyNews() {
+            const text = document.getElementById('newsText').value;
+            const verifyDiv = document.getElementById('verifyResult');
+
+            if (!text.trim()) {
+                alert('Please enter some text first.');
+                return;
+            }
+
+            verifyDiv.style.display = 'block';
+            verifyDiv.className = '';
+            verifyDiv.innerHTML = 'Searching real news sources...';
+
+            const response = await fetch('/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                verifyDiv.innerHTML = 'Error: ' + data.error;
+                return;
+            }
+
+            let cssClass = 'verify-false';
+            if (data.verdict === 'LIKELY TRUE') cssClass = 'verify-true';
+            else if (data.verdict === 'UNCERTAIN - LIMITED EVIDENCE') cssClass = 'verify-uncertain';
+
+            verifyDiv.className = cssClass;
+
+            let html = `<strong>${data.verdict}</strong> (${data.sources_found} sources found)`;
+
+            if (data.articles && data.articles.length > 0) {
+                html += '<div>';
+                data.articles.forEach(a => {
+                    html += `<div class="article-item">📰 <a href="${a.url}" target="_blank">${a.title}</a> — ${a.source}</div>`;
+                });
+                html += '</div>';
+            }
+
+            verifyDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

@@ -45,7 +45,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
 
 # Train a Logistic Regression model
-model = LogisticRegression(max_iter=1000)
+model = LogisticRegression(max_iter=1000, class_weight='balanced')
 model.fit(X_train_tfidf, y_train)
 
 # Make predictions on the test set
